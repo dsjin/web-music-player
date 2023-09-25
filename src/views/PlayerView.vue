@@ -2,6 +2,21 @@
   <div>
     <h1>Local Music Player</h1>
     <input type="file" @change="handleFileUpload" />
+    <div>
+      Selected mode: {{ mode }}
+    </div>
+    <div>
+      <input v-model="mode" type="radio" id="nonRepeat" name="mode" value="nonRepeat"/>
+      <label for="nonRepeat">Non Repeat</label>
+    </div>
+    <div>
+      <input v-model="mode" type="radio" id="repeatAll" name="mode" value="repeatAll" />
+      <label for="repeatAll">Repeat All</label>
+    </div>
+    <div>
+      <input v-model="mode" type="radio" id="repeatOnce" name="mode" value="repeatOnce" />
+      <label for="repeatOnce">Repeat Once</label>
+    </div>
     <div v-for="(song, index) in playlist" :key="index">
       <div
         :style="{
@@ -36,6 +51,7 @@ interface data {
   playlist: Playlist[]
   currentSongIndex?: number
   sound?: Howl
+  mode: string
 }
 
 export default {
@@ -44,6 +60,7 @@ export default {
       playlist: [],
       currentSongIndex: undefined,
       sound: undefined,
+      mode: 'nonRepeat'
     }
   },
   methods: {
@@ -81,6 +98,7 @@ export default {
         src: [song.url],
       })
 
+      this.sound.on('end', this.songEndHandler)
       this.sound.play()
     },
     pauseSong() {
@@ -92,12 +110,29 @@ export default {
       if (this.sound) {
         this.sound.stop()
       }
+    },
+    songEndHandler () {
+      if (this.currentSongIndex !== undefined) {
+        if (this.mode === 'repeatOnce') {
+          this.playSong(this.currentSongIndex)
+          return
+        }
+        const isFinal = this.currentSongIndex === (this.playlist.length - 1)
+        this.currentSongIndex = (this.currentSongIndex + 1) % this.playlist.length
+        this.sound?.unload()
+        this.sound = undefined
+        if ((this.mode === 'nonRepeat' && !isFinal ) || this.mode === 'repeatAll') {
+          this.playSong(this.currentSongIndex)
+        }
+      }
     }
   },
   beforeDestroy() {
     if (this.sound) {
+      this.sound.stop()
       this.sound.unload()
+      this.sound = undefined
     }
-  },
+  }
 }
 </script>
