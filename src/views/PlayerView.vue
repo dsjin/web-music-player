@@ -33,25 +33,29 @@
       <button :disabled="currentSongIndex === undefined" @click="currentSongIndex !== undefined ? pauseSong() : null">Pause</button>
       <button :disabled="currentSongIndex === undefined" @click="currentSongIndex !== undefined ? stopSong() : null">Stop</button>
     </div>
+    <div v-if="sound">
+      {{ formatTime(time) }} / {{ formatTime(playlist[currentSongIndex!!].metadata.duration ?? 0) }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { Howl, Howler } from 'howler'
 import * as mmb from 'music-metadata-browser'
-import type { ICommonTagsResult, IAudioMetadata } from 'music-metadata/lib/type'
+import type { ICommonTagsResult, IAudioMetadata,  } from 'music-metadata/lib/type'
 
 type Playlist = {
   filename: string
   url: string
-  metadata: ICommonTagsResult
+  metadata: ICommonTagsResult & { duration?: number }
 }
 
 interface data {
   playlist: Playlist[]
   currentSongIndex?: number
   sound?: Howl
-  mode: string
+  mode: string,
+  time: number
 }
 
 export default {
@@ -60,7 +64,8 @@ export default {
       playlist: [],
       currentSongIndex: undefined,
       sound: undefined,
-      mode: 'nonRepeat'
+      mode: 'nonRepeat',
+      time: 0
     }
   },
   methods: {
@@ -73,7 +78,7 @@ export default {
         async () => {
           const url = reader.result as string
           const metadata: IAudioMetadata = await mmb.parseBlob(blob)
-          this.playlist.push({ filename: file.name, url, metadata: metadata.common})
+          this.playlist.push({ filename: file.name, url, metadata: {...metadata.common, duration: metadata.format.duration}})
         }
       )
       reader.readAsDataURL(file)
@@ -96,9 +101,9 @@ export default {
 
       this.sound = new Howl({
         src: [song.url],
+        onplay: this.songPlayingHandler,
+        onend: this.songEndHandler
       })
-
-      this.sound.on('end', this.songEndHandler)
       this.sound.play()
     },
     pauseSong() {
@@ -109,6 +114,7 @@ export default {
     stopSong() {
       if (this.sound) {
         this.sound.stop()
+        this.time = 0
       }
     },
     songEndHandler () {
@@ -125,6 +131,19 @@ export default {
           this.playSong(this.currentSongIndex)
         }
       }
+    },
+    songPlayingHandler () {
+      // console.log(this.sound?.seek(), ((((this.sound?.seek() ?? 0) / (this.sound?.duration() ?? 1)) * 100) || 0))
+      this.time = this.sound?.seek() ?? 0
+      if (this.sound?.playing()) {
+        requestAnimationFrame(this.songPlayingHandler)
+      }
+    },
+    formatTime (secs: number) {
+      secs = Math.round(secs)
+      let minutes = Math.floor(secs / 60) || 0
+      let seconds = (secs - minutes * 60) || 0
+      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
     }
   },
   beforeDestroy() {
