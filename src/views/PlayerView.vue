@@ -10,7 +10,7 @@
         }"
         @click="handleChangingSong(index)"
       >
-        {{ song.name }}
+        {{ song.metadata.title ?? song.filename }}
       </div>
     </div>
     <div>
@@ -23,10 +23,13 @@
 
 <script lang="ts">
 import { Howl, Howler } from 'howler'
+import * as mmb from 'music-metadata-browser'
+import type { ICommonTagsResult, IAudioMetadata } from 'music-metadata/lib/type'
 
 type Playlist = {
-  name: string
+  filename: string
   url: string
+  metadata: ICommonTagsResult
 }
 
 interface data {
@@ -44,14 +47,16 @@ export default {
     }
   },
   methods: {
-    handleFileUpload(event: any) {
-      const file = event.target.files[0]
+    async handleFileUpload(event: any) {
+      const file: File = event.target.files[0]
+      const blob = new Blob([file], {type: file.type})
       const reader = new FileReader()
       reader.addEventListener(
         'load',
-        () => {
+        async () => {
           const url = reader.result as string
-          this.playlist.push({ name: file.name, url })
+          const metadata: IAudioMetadata = await mmb.parseBlob(blob)
+          this.playlist.push({ filename: file.name, url, metadata: metadata.common})
         }
       )
       reader.readAsDataURL(file)
